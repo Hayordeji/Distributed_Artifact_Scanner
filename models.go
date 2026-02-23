@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 type FileTask struct {
 	Path string
@@ -31,4 +34,10 @@ type ScanConfig struct {
 	Directories []string
 	WorkerCount int
 	MaxFileSize int64
+}
+
+type ServerContext struct {
+	Metrics      *ScanMetrics
+	MetricsMutex *sync.RWMutex
+	CancelFunc   func()
 }

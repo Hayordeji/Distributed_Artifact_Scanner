@@ -22,6 +22,7 @@ func DiscoverFiles(config ScanConfig, tasksChannel chan FileTask, doneChannel ch
 		//WALK DIRECTORY
 		err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
+
 				fmt.Printf("Error accessing %s: %v\n", path, err)
 				return nil
 			}
