@@ -34,7 +34,7 @@ func NewServer(metrics *ScanMetrics, doneChannel chan struct{}, metricsMutex *sy
 
 	mux := http.NewServeMux()
 
-	//MAP ENDPOINTS
+	//REGISTER ENDPOINTS
 	mux.HandleFunc("/status", server.handleStatus)
 	mux.HandleFunc("/metrics", server.handleMetrics)
 	mux.HandleFunc("/cancel", server.handleCancel)
@@ -61,11 +61,13 @@ func (s *Server) Stop() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := s.httpServer.Shutdown(ctx); err != nil {
+	err := s.httpServer.Shutdown(ctx)
+	if err != nil {
 		fmt.Printf("HTTP server shutdown error: %v\n", err)
 	} else {
 		fmt.Println("HTTP server stopped gracefully")
 	}
+
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -97,7 +99,33 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.metricsMutex.RLock()
-	metricsCopy := *s.metrics // Shallow copy
+
+	//CREATE A NEW METRICS
+	metricsCopy := ScanMetrics{
+		TotalFiles:   s.metrics.TotalFiles,
+		TotalBytes:   s.metrics.TotalBytes,
+		FilesScanned: s.metrics.FilesScanned,
+		FilesPending: s.metrics.FilesPending,
+		StartTime:    s.metrics.StartTime,
+		EndTime:      s.metrics.EndTime,
+		Duplicates:   make(map[string][]string, len(s.metrics.Duplicates)),
+		TypeCount:    make(map[string]int, len(s.metrics.TypeCount)),
+
+		Errors: make([]string, len(s.metrics.Errors)),
+	}
+
+	//COPY ALL METRICS FROM EXISTING SERVER METRICS TO NEW METRICS
+	for hash, paths := range s.metrics.Duplicates {
+		pathsCopy := make([]string, len(paths))
+		copy(pathsCopy, paths)
+		metricsCopy.Duplicates[hash] = pathsCopy
+	}
+
+	//COPY ALL TYPE COUNT FROM EXISTING SERVER TYPE COUNTS TO NEW TYPE COUNTS
+	for ext, count := range s.metrics.TypeCount {
+		metricsCopy.TypeCount[ext] = count
+	}
+	copy(metricsCopy.Errors, s.metrics.Errors)
 	s.metricsMutex.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")

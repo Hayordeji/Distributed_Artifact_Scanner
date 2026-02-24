@@ -5,11 +5,10 @@ import (
 	"sync"
 )
 
-func CollectResults(resultsChannel chan ScanResult, doneChannel chan struct{}, metrics *ScanMetrics) {
+func CollectResults(resultsChannel chan ScanResult, doneChannel chan struct{}, metrics *ScanMetrics, metricsMutex *sync.RWMutex) {
 
 	metrics.Duplicates = make(map[string][]string)
 	metrics.TypeCount = make(map[string]int)
-	var metricsMutex sync.Mutex
 	for {
 		select {
 		case result, ok := <-resultsChannel:
@@ -21,7 +20,6 @@ func CollectResults(resultsChannel chan ScanResult, doneChannel chan struct{}, m
 			metricsMutex.Lock()
 			metrics.FilesScanned++
 			metrics.TotalBytes += result.Size
-			metricsMutex.Unlock()
 
 			if result.Error != "" {
 				metrics.Errors = append(metrics.Errors, result.Error)
@@ -36,6 +34,7 @@ func CollectResults(resultsChannel chan ScanResult, doneChannel chan struct{}, m
 			}
 
 			metrics.TypeCount[result.FileType]++
+			metricsMutex.Unlock()
 
 		case <-doneChannel:
 			return
