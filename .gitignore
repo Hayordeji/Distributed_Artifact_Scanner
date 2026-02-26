@@ -1,0 +1,9 @@
+/Scan_Results.json
+  scanner
+   scanner.exe
+   *.out
+   coverage.out
+   scan-results.json
+   test-data/
+Distributed_Artifact_Scanner.exe
+scanner
