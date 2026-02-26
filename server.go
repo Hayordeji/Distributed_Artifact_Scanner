@@ -100,34 +100,11 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 	s.metricsMutex.RLock()
 
-	//CREATE A NEW METRICS
-	metricsCopy := ScanMetrics{
-		TotalFiles:   s.metrics.TotalFiles,
-		TotalBytes:   s.metrics.TotalBytes,
-		FilesScanned: s.metrics.FilesScanned,
-		FilesPending: s.metrics.FilesPending,
-		StartTime:    s.metrics.StartTime,
-		EndTime:      s.metrics.EndTime,
-		Duplicates:   make(map[string][]string, len(s.metrics.Duplicates)),
-		TypeCount:    make(map[string]int, len(s.metrics.TypeCount)),
-
-		Errors: make([]string, len(s.metrics.Errors)),
-	}
-
-	//COPY ALL METRICS FROM EXISTING SERVER METRICS TO NEW METRICS
-	for hash, paths := range s.metrics.Duplicates {
-		pathsCopy := make([]string, len(paths))
-		copy(pathsCopy, paths)
-		metricsCopy.Duplicates[hash] = pathsCopy
-	}
-
-	//COPY ALL TYPE COUNT FROM EXISTING SERVER TYPE COUNTS TO NEW TYPE COUNTS
-	for ext, count := range s.metrics.TypeCount {
-		metricsCopy.TypeCount[ext] = count
-	}
-	copy(metricsCopy.Errors, s.metrics.Errors)
+	//GATHER ACTUAL DUPLICATES... NORMAL METRICS SAVES BOTH DUPLICATES AND NON DUPLICATES
+	metricsCopy := CollectRealMetrics(s.metrics)
 	s.metricsMutex.RUnlock()
 
+	//RETURN DATA
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(metricsCopy)
 }

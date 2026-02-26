@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-func Worker(id int, taskChannel chan FileTask, resultsChannel chan ScanResult, doneChannel chan struct{}) {
+func WorkerProcessFiles(id int, taskChannel chan FileTask, resultsChannel chan ScanResult, doneChannel chan struct{}) {
 
 	for {
 		select {
@@ -19,7 +19,6 @@ func Worker(id int, taskChannel chan FileTask, resultsChannel chan ScanResult, d
 				return
 			}
 			result := ProcessFiles(task)
-
 			select {
 			case resultsChannel <- result:
 

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 )
@@ -33,7 +35,7 @@ func main() {
 		StartTime:  time.Now(),
 		Duplicates: make(map[string][]string),
 		TypeCount:  make(map[string]int),
-		Errors:     make([]string, 0),
+		Errors:     make([]FileError, 0),
 	}
 
 	metricsMutex := &sync.RWMutex{}
@@ -43,14 +45,14 @@ func main() {
 	server.Start()
 
 	//GOROUTINE FOR DISCOVERING FILES
-	go DiscoverFiles(config, tasksChannel, doneChannel)
+	go DiscoverFiles(config, tasksChannel, doneChannel, metrics, metricsMutex)
 
 	var workerWaitGroup sync.WaitGroup
 	workerWaitGroup.Add(config.WorkerCount)
 
 	for i := 0; i < config.WorkerCount; i++ {
 		go func(id int) {
-			Worker(id, tasksChannel, resultsChannel, doneChannel)
+			WorkerProcessFiles(id, tasksChannel, resultsChannel, doneChannel)
 			workerWaitGroup.Done()
 
 		}(i)
@@ -59,13 +61,13 @@ func main() {
 	collectorDone := make(chan struct{})
 	go func() {
 		CollectResults(resultsChannel, doneChannel, metrics, metricsMutex)
+		metrics.EndTime = time.Now()
 		close(collectorDone)
 	}()
 
 	go func() {
 		workerWaitGroup.Wait()
 		close(resultsChannel)
-
 	}()
 
 	select {
@@ -79,6 +81,13 @@ func main() {
 	metricsMutex.Lock()
 	metrics.EndTime = time.Now()
 	metricsMutex.Unlock()
+
+	err := saveResults(metrics, "Scan_Results.json")
+	if err != nil {
+		fmt.Printf("Error saving results: %v\n", err)
+	} else {
+		fmt.Println("Results saved to scan-results.json")
+	}
 
 	server.Stop()
 	metricsMutex.RLock()
@@ -97,4 +106,18 @@ func countDuplicates(metrics *ScanMetrics) int {
 		}
 	}
 	return count
+}
+
+func saveResults(metrics *ScanMetrics, fileName string) error {
+	file, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+
+	metricsResult := CollectRealMetrics(metrics)
+
+	defer file.Close()
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", " ")
+	return encoder.Encode(metricsResult)
 }

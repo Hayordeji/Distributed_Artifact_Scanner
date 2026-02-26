@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
-func DiscoverFiles(config ScanConfig, tasksChannel chan FileTask, doneChannel chan struct{}) {
+func DiscoverFiles(config ScanConfig, tasksChannel chan FileTask, doneChannel chan struct{}, metrics *ScanMetrics, metricsMutex *sync.RWMutex) {
 	for _, dir := range config.Directories {
 		//CHECK IF PATH IS A DIRECTORY
 		dirInfo, err := os.Stat(dir)
@@ -41,6 +42,12 @@ func DiscoverFiles(config ScanConfig, tasksChannel chan FileTask, doneChannel ch
 			//ADD FILE TASK TO CHANNEL FOR PROCESSING
 			task := FileTask{Path: path, Size: info.Size()}
 
+			//LOCK Metric.TotalFIles to prevent concurrency issues
+			metricsMutex.Lock()
+			metrics.TotalFiles++
+			metricsMutex.Unlock()
+
+			//SEND TASK THROUGH TASK CHANNEL
 			select {
 			case tasksChannel <- task:
 
